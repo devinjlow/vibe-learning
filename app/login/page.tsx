@@ -1,13 +1,81 @@
 'use client';
 
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import Link from "next/link"
 import { Github } from "lucide-react"
+import { supabase } from '@/lib/supabase'
 
 export default function LoginPage() {
+  const router = useRouter()
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [resetSent, setResetSent] = useState(false)
+
+  const handleSignIn = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true)
+    setError(null)
+
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
+
+      if (error) {
+        throw error
+      }
+
+      if (data.user) {
+        // Check if user has completed onboarding
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('background')
+          .eq('id', data.user.id)
+          .single()
+
+        if (!profile?.background) {
+          router.push('/onboarding')
+        } else {
+          router.push('/dashboard')
+        }
+      }
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'An error occurred during sign in')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true)
+    setError(null)
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth/callback?next=/reset-password`,
+      })
+
+      if (error) {
+        throw error
+      }
+
+      setResetSent(true)
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'An error occurred while sending reset email')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
     <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center">
       <Card className="w-full max-w-md">
@@ -32,22 +100,53 @@ export default function LoginPage() {
               </span>
             </div>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              placeholder="m@example.com"
-            />
+          <form onSubmit={handleSignIn} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="m@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                disabled={loading}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                disabled={loading}
+                required
+              />
+            </div>
+            {error && (
+              <div className="text-sm text-red-500">
+                {error}
+              </div>
+            )}
+            {resetSent && (
+              <div className="text-sm text-green-500">
+                Password reset email sent! Check your inbox.
+              </div>
+            )}
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? 'Signing in...' : 'Sign In'}
+            </Button>
+          </form>
+          <div className="text-sm text-center">
+            <button
+              onClick={handleResetPassword}
+              className="text-primary hover:underline"
+              disabled={loading || !email}
+            >
+              Forgot your password?
+            </button>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
-            <Input
-              id="password"
-              type="password"
-            />
-          </div>
-          <Button className="w-full">Sign In</Button>
         </CardContent>
         <CardFooter>
           <div className="text-sm text-muted-foreground text-center w-full">
