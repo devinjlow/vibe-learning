@@ -6,7 +6,7 @@ export default function Settings() {
     <div className="space-y-6">
       <h1 className="text-3xl font-bold">Account Settings</h1>
       
-      <Card>
+      <Card className="hover:shadow-lg transition-shadow">
         <CardHeader>
           <CardTitle>Profile Information</CardTitle>
           <CardDescription>Update your account's profile information</CardDescription>
@@ -40,7 +40,7 @@ export default function Settings() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="hover:shadow-lg transition-shadow">
         <CardHeader>
           <CardTitle>Notification Preferences</CardTitle>
           <CardDescription>Manage how you receive notifications</CardDescription>
@@ -64,7 +64,7 @@ export default function Settings() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="hover:shadow-lg transition-shadow">
         <CardHeader>
           <CardTitle>Danger Zone</CardTitle>
           <CardDescription>Irreversible and destructive actions</CardDescription>
