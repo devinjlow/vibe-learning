@@ -17,9 +17,21 @@ import { X } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
 
 interface UserDetails {
+  id?: string
   background: string
   experience: string
   interests: string[]
+  created_at?: string
+  updated_at?: string
+}
+
+interface UserDetailsData {
+  id: string
+  background: string
+  experience: string
+  interests: string[]
+  updated_at: string
+  created_at?: string
 }
 
 // Mock data for user's projects and tasks
@@ -45,14 +57,22 @@ const userProjects = [
 ]
 
 const backgroundOptions = [
-  "Computer Science",
-  "Software Engineering",
-  "Data Science",
-  "Web Development",
-  "Mobile Development",
-  "DevOps",
+  "Student",
+  "Engineering Professional",
+  "Self-taught Developer",
+  "Bootcamp Graduate",
   "Other"
 ] as const
+
+const backgroundDisplayNames = {
+  computer_science: "Computer Science",
+  software_engineering: "Software Engineering",
+  data_science: "Data Science",
+  web_development: "Web Development",
+  mobile_development: "Mobile Development",
+  devops: "DevOps",
+  other: "Other"
+} as const
 
 const experienceOptions = [
   "0-2 years",
@@ -71,7 +91,8 @@ const interestOptions = [
   "Cybersecurity",
   "UI/UX Design",
   "Game Development",
-  "Blockchain"
+  "Blockchain",
+  "Health & Wellness"
 ] as const
 
 type BackgroundOption = typeof backgroundOptions[number]
@@ -97,8 +118,18 @@ export default function Profile() {
           .eq('id', user.id)
           .single()
 
-        if (error) throw error
-        setUserDetails(data)
+        if (error && error.code !== 'PGRST116') throw error // PGRST116 is "no rows returned"
+        
+        if (data) {
+          setUserDetails(data)
+        } else {
+          // Initialize with empty values if no record exists
+          setUserDetails({
+            background: '',
+            experience: '',
+            interests: []
+          })
+        }
       } catch (error) {
         console.error('Error fetching user details:', error)
         toast({
@@ -122,48 +153,69 @@ export default function Profile() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('No user found')
 
-      // First, check if the record exists
-      const { data: existingRecord, error: checkError } = await supabase
+      // Validate required fields
+      if (!userDetails.background || !userDetails.experience) {
+        throw new Error('Background and experience are required')
+      }
+
+      // Basic validation for background
+      if (userDetails.background.trim() === '') {
+        throw new Error('Background cannot be empty')
+      }
+
+      // Basic validation for experience
+      if (userDetails.experience.trim() === '') {
+        throw new Error('Experience cannot be empty')
+      }
+
+      const now = new Date().toISOString()
+      
+      // Ensure interests is a proper array of strings
+      const interests = Array.isArray(userDetails.interests) 
+        ? userDetails.interests.filter(interest => typeof interest === 'string' && interest.trim() !== '')
+        : []
+
+      const data: UserDetailsData = {
+        id: user.id,
+        background: userDetails.background,
+        experience: userDetails.experience,
+        interests: interests,
+        updated_at: now
+      }
+
+      // If this is a new record, add created_at
+      if (!userDetails.id) {
+        data.created_at = now
+      }
+
+      // Debug log the data being sent
+      console.log('Sending data to database:', JSON.stringify(data, null, 2))
+
+      const { error } = await supabase
         .from('user_details')
-        .select('id')
+        .upsert(data, {
+          onConflict: 'id'
+        })
+
+      if (error) {
+        console.error('Full error object:', JSON.stringify(error, null, 2))
+        console.error('Error code:', error.code)
+        console.error('Error message:', error.message)
+        console.error('Error details:', error.details)
+        throw new Error(error.message || 'Failed to update profile')
+      }
+
+      // Refresh the user details after successful save
+      const { data: updatedData, error: fetchError } = await supabase
+        .from('user_details')
+        .select('*')
         .eq('id', user.id)
         .single()
 
-      if (checkError && checkError.code !== 'PGRST116') { // PGRST116 is "no rows returned"
-        throw checkError
-      }
-
-      let error
-      if (existingRecord) {
-        // Update existing record
-        const { error: updateError } = await supabase
-          .from('user_details')
-          .update({
-            background: userDetails.background,
-            experience: userDetails.experience,
-            interests: userDetails.interests,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', user.id)
-        error = updateError
+      if (fetchError) {
+        console.error('Error fetching updated details:', fetchError)
       } else {
-        // Insert new record
-        const { error: insertError } = await supabase
-          .from('user_details')
-          .insert({
-            id: user.id,
-            background: userDetails.background,
-            experience: userDetails.experience,
-            interests: userDetails.interests,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          })
-        error = insertError
-      }
-
-      if (error) {
-        console.error('Error details:', error)
-        throw error
+        setUserDetails(updatedData)
       }
 
       toast({
@@ -243,7 +295,7 @@ export default function Profile() {
               {editing ? (
                 <Select
                   value={userDetails?.background}
-                  onValueChange={(value: BackgroundOption) => setUserDetails(prev => prev ? { ...prev, background: value } : null)}
+                  onValueChange={(value: string) => setUserDetails(prev => prev ? { ...prev, background: value } : null)}
                 >
                   <SelectTrigger className="w-[200px]">
                     <SelectValue placeholder="Select background" />

@@ -15,47 +15,38 @@ export async function GET(request: Request) {
     try {
       // Exchange the code for a session
       const { error: sessionError } = await supabase.auth.exchangeCodeForSession(code)
-      if (sessionError) {
-        console.error('Auth callback - Session error:', sessionError)
-        return NextResponse.redirect(new URL('/', requestUrl.origin))
-      }
+      if (sessionError) throw sessionError
 
-      // Get the user
+      // Get the user's details
       const { data: { user }, error: userError } = await supabase.auth.getUser()
-      if (userError) {
-        console.error('Auth callback - User error:', userError)
-        return NextResponse.redirect(new URL('/', requestUrl.origin))
-      }
-
-      console.log('Auth callback - User:', user?.id)
+      if (userError) throw userError
 
       if (user) {
         // Check if user has completed onboarding
         const { data: userDetails, error: detailsError } = await supabase
           .from('user_details')
-          .select('*')  // Select all fields to see what's stored
+          .select('background, experience')
           .eq('id', user.id)
           .single()
 
-        console.log('Auth callback - User details:', userDetails)
-        console.log('Auth callback - Details error:', detailsError)
+        if (detailsError && detailsError.code !== 'PGRST116') { // PGRST116 is "no rows returned"
+          console.error('Error fetching user details:', detailsError)
+          throw detailsError
+        }
 
-        // Redirect based on whether user has completed onboarding
-        if (userDetails && userDetails.background && userDetails.experience) {
-          console.log('Auth callback - User has completed onboarding, redirecting to projects')
-          return NextResponse.redirect(new URL('/projects', requestUrl.origin))
+        // Redirect based on onboarding status
+        if (!userDetails?.background || !userDetails?.experience) {
+          return NextResponse.redirect(`${requestUrl.origin}/onboarding`)
         } else {
-          console.log('Auth callback - User has not completed onboarding, redirecting to onboarding')
-          return NextResponse.redirect(new URL('/onboarding', requestUrl.origin))
+          return NextResponse.redirect(`${requestUrl.origin}/projects`)
         }
       }
     } catch (error) {
-      console.error('Auth callback - Unexpected error:', error)
-      return NextResponse.redirect(new URL('/', requestUrl.origin))
+      console.error('Auth callback error:', error)
+      return NextResponse.redirect(`${requestUrl.origin}/?error=auth_callback_failed`)
     }
   }
 
-  // Return to home page if something goes wrong
-  console.log('Auth callback - No code provided, redirecting to home')
-  return NextResponse.redirect(new URL('/', requestUrl.origin))
+  // Return the user to an error page with some instructions
+  return NextResponse.redirect(`${requestUrl.origin}/?error=auth_callback_missing_code`)
 } 

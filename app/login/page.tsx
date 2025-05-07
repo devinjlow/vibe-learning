@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import Link from "next/link"
 import { Github } from "lucide-react"
-import { supabase } from '@/lib/supabase'
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -17,6 +17,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [resetSent, setResetSent] = useState(false)
+  const supabase = createClientComponentClient()
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -24,14 +25,18 @@ export default function LoginPage() {
     setError(null)
 
     try {
+      console.log('Attempting to sign in...')
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
 
       if (error) {
+        console.error('Sign in error:', error)
         throw error
       }
+
+      console.log('Sign in successful:', data)
 
       if (data.user) {
         // Check if user has completed onboarding
@@ -46,13 +51,18 @@ export default function LoginPage() {
           throw detailsError
         }
 
+        console.log('User details:', userDetails)
+
         if (!userDetails?.background || !userDetails?.experience) {
+          console.log('Redirecting to onboarding...')
           router.push('/onboarding')
         } else {
+          console.log('Redirecting to projects...')
           router.push('/projects')
         }
       }
     } catch (error) {
+      console.error('Login error:', error)
       setError(error instanceof Error ? error.message : 'An error occurred during sign in')
     } finally {
       setLoading(false)
