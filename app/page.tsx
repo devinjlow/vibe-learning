@@ -87,15 +87,21 @@ export default function LandingPage() {
 
       {/* CTA Section */}
       <section className="py-20">
-        <div className="container mx-auto px-4 text-center">
-          <h2 className="text-4xl font-bold mb-6">Ready to Get Started?</h2>
-          <div className="flex justify-center gap-4">
-            <Button size="lg" asChild>
-              <Link href="/signup">Sign Up Now</Link>
-            </Button>
-            <Button size="lg" variant="outline" asChild>
-              <Link href="/login">Login</Link>
-            </Button>
+        <div className="container">
+          <div className="mx-auto max-w-2xl text-center">
+            <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
+              Ready to start your learning journey?
+            </h2>
+            <p className="mt-4 text-lg text-muted-foreground">
+              Join our community of learners and start building your future today.
+            </p>
+            <div className="mt-8 flex justify-center gap-4">
+              <Link href="/signup">
+                <Button size="lg">
+                  Get Started
+                </Button>
+              </Link>
+            </div>
           </div>
         </div>
       </section>

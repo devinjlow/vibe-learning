@@ -4,46 +4,46 @@ import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 
 interface LoadingSplashProps {
-  onComplete?: () => void
-  duration?: number
+  onComplete: () => void
 }
 
-export function LoadingSplash({ onComplete, duration = 2000 }: LoadingSplashProps) {
+export function LoadingSplash({ onComplete }: LoadingSplashProps) {
   const [progress, setProgress] = useState(0)
 
   useEffect(() => {
-    const startTime = Date.now()
-    const interval = setInterval(() => {
-      const elapsed = Date.now() - startTime
-      const newProgress = Math.min((elapsed / duration) * 100, 100)
-      setProgress(newProgress)
-
-      if (newProgress >= 100) {
-        clearInterval(interval)
-        onComplete?.()
+    const timer = setTimeout(() => {
+      if (progress < 100) {
+        setProgress(prev => prev + 1)
+      } else {
+        onComplete()
       }
-    }, 16) // ~60fps
+    }, 20)
 
-    return () => clearInterval(interval)
-  }, [duration, onComplete])
+    return () => clearTimeout(timer)
+  }, [progress, onComplete])
 
   return (
     <div className="fixed inset-0 bg-background z-50 flex items-center justify-center">
-      {/* Large centered logo */}
       <div className="relative w-64 h-64">
-        {/* Background logo */}
-        <div className="absolute inset-0 flex items-center justify-center">
-          <span className="text-8xl font-bold text-muted-foreground">vibe</span>
-        </div>
-        
-        {/* Animated fill logo */}
         <motion.div
-          className="absolute inset-0 flex items-center justify-center overflow-hidden"
-          style={{
-            width: `${progress}%`,
-          }}
+          className="absolute inset-0 bg-primary rounded-full"
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          transition={{ duration: 0.5 }}
+        />
+        <motion.div
+          className="absolute inset-0 bg-background rounded-full"
+          initial={{ scale: 0 }}
+          animate={{ scale: 0.9 }}
+          transition={{ duration: 0.5 }}
+        />
+        <motion.div
+          className="absolute inset-0 flex items-center justify-center text-4xl font-bold"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.3 }}
         >
-          <span className="text-8xl font-bold text-foreground whitespace-nowrap">vibe</span>
+          {progress}%
         </motion.div>
       </div>
     </div>
