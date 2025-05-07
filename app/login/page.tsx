@@ -35,16 +35,21 @@ export default function LoginPage() {
 
       if (data.user) {
         // Check if user has completed onboarding
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('background')
+        const { data: userDetails, error: detailsError } = await supabase
+          .from('user_details')
+          .select('background, experience')
           .eq('id', data.user.id)
           .single()
 
-        if (!profile?.background) {
+        if (detailsError) {
+          console.error('Error fetching user details:', detailsError)
+          throw detailsError
+        }
+
+        if (!userDetails?.background || !userDetails?.experience) {
           router.push('/onboarding')
         } else {
-          router.push('/dashboard')
+          router.push('/projects')
         }
       }
     } catch (error) {
