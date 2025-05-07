@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
+import { LoadingSplash } from '@/components/ui/loading-splash'
 
 const BACKGROUND_OPTIONS = [
   "Student",
@@ -41,6 +42,7 @@ export default function Onboarding() {
   const [currentStep, setCurrentStep] = useState(1)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showSplash, setShowSplash] = useState(false)
   const [formData, setFormData] = useState({
     background: '',
     experience: '',
@@ -167,32 +169,56 @@ export default function Onboarding() {
     setError(null)
 
     try {
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { user }, error: userError } = await supabase.auth.getUser()
       
-      if (!user) {
-        throw new Error('No user found')
+      if (userError) throw userError
+      if (!user) throw new Error('No user found')
+
+      // First, check if user details already exist
+      const { data: existingDetails } = await supabase
+        .from('user_details')
+        .select('id')
+        .eq('id', user.id)
+        .single()
+
+      if (existingDetails) {
+        // Update existing details
+        const { error: updateError } = await supabase
+          .from('user_details')
+          .update({
+            background: formData.background,
+            experience: formData.experience,
+            interests: formData.interests,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', user.id)
+
+        if (updateError) throw updateError
+      } else {
+        // Insert new details
+        const { error: insertError } = await supabase
+          .from('user_details')
+          .insert({
+            id: user.id,
+            background: formData.background,
+            experience: formData.experience,
+            interests: formData.interests,
+          })
+
+        if (insertError) throw insertError
       }
 
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .upsert({
-          id: user.id,
-          background: formData.background,
-          experience: formData.experience,
-          interests: formData.interests,
-          updated_at: new Date().toISOString(),
-        })
-
-      if (updateError) {
-        throw updateError
-      }
-
-      router.push('/dashboard')
+      // Show loading splash before navigation
+      setShowSplash(true)
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'An error occurred')
-    } finally {
+      console.error('Error saving user details:', error)
+      setError(error instanceof Error ? error.message : 'An error occurred while saving your details')
       setLoading(false)
     }
+  }
+
+  const handleSplashComplete = () => {
+    router.push('/projects')
   }
 
   const renderStep = () => {
@@ -280,6 +306,10 @@ export default function Onboarding() {
       default:
         return false
     }
+  }
+
+  if (showSplash) {
+    return <LoadingSplash onComplete={handleSplashComplete} />
   }
 
   return (
