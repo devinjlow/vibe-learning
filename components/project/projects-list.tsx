@@ -4,7 +4,10 @@ import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { CreateProjectDialog } from "@/components/project/create-project-dialog"
+import { ApplyToJoinDialog } from "@/components/project/apply-to-join-dialog"
+import Link from "next/link"
 import { supabase } from "@/lib/supabase"
+import { authState } from "@/lib/auth-state"
 
 interface Project {
   id: string
@@ -13,30 +16,117 @@ interface Project {
   owner: string
 }
 
-interface ProjectsListProps {
-  projects: Project[]
+interface ProjectMember {
+  id: string
+  project_id: string
+  user_id: string
+  status: 'pending' | 'accepted' | 'rejected'
 }
 
-// Import the shared auth state
-declare const authState: {
-  isAuthenticated: boolean
-  isLoading: boolean
-  listeners: Set<(isAuthenticated: boolean) => void>
+interface ProjectsListProps {
+  projects: Project[]
 }
 
 export function ProjectsList({ projects }: ProjectsListProps) {
   const [isAuthenticated, setIsAuthenticated] = useState(authState.isAuthenticated)
   const [isLoading, setIsLoading] = useState(authState.isLoading)
+  const [projectMemberships, setProjectMemberships] = useState<Record<string, ProjectMember>>({})
 
   useEffect(() => {
+    // Check authentication state on mount
+    const checkAuth = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        setIsAuthenticated(!!user)
+        authState.updateAuthState(!!user)
+        
+        if (user) {
+          // Fetch all project memberships for the current user
+          const { data: memberships, error } = await supabase
+            .from('project_members')
+            .select('*')
+            .eq('user_id', user.id)
+
+          if (error) {
+            console.error('Error fetching memberships:', error)
+            return
+          }
+
+          // Convert array to object for easier lookup
+          const membershipsMap = memberships.reduce((acc, membership) => {
+            acc[membership.project_id] = membership
+            return acc
+          }, {} as Record<string, ProjectMember>)
+
+          setProjectMemberships(membershipsMap)
+        }
+      } catch (error) {
+        console.error('Error checking auth:', error)
+        setIsAuthenticated(false)
+        authState.updateAuthState(false)
+      } finally {
+        setIsLoading(false)
+        authState.setLoading(false)
+      }
+    }
+
+    checkAuth()
+
+    // Subscribe to auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      const isAuth = !!session?.user
+      setIsAuthenticated(isAuth)
+      authState.updateAuthState(isAuth)
+    })
+
     // Add this component as a listener
     authState.listeners.add(setIsAuthenticated)
     setIsLoading(authState.isLoading)
 
     return () => {
       authState.listeners.delete(setIsAuthenticated)
+      subscription.unsubscribe()
     }
   }, [])
+
+  const getButtonContent = (projectId: string) => {
+    const membership = projectMemberships[projectId]
+    
+    if (!membership) {
+      return {
+        text: "Apply to Join",
+        variant: "default" as const,
+        disabled: false
+      }
+    }
+
+    switch (membership.status) {
+      case 'pending':
+        return {
+          text: "Application Pending",
+          variant: "outline" as const,
+          disabled: true
+        }
+      case 'accepted':
+        return {
+          text: "Already Joined",
+          variant: "outline" as const,
+          disabled: true
+        }
+      case 'rejected':
+        return {
+          text: "Application Rejected",
+          variant: "outline" as const,
+          disabled: true
+        }
+      default:
+        return {
+          text: "Apply to Join",
+          variant: "default" as const,
+          disabled: false
+        }
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -51,20 +141,46 @@ export function ProjectsList({ projects }: ProjectsListProps) {
         )}
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {projects?.map((project) => (
-          <Card key={project.id} className="hover:shadow-lg transition-shadow">
-            <CardHeader>
-              <CardTitle>{project.title}</CardTitle>
-              <CardDescription>By {project.owner}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">{project.description}</p>
-            </CardContent>
-            <CardFooter>
-              <Button className="w-full">Apply to Join</Button>
-            </CardFooter>
-          </Card>
-        ))}
+        {projects?.map((project) => {
+          const buttonContent = getButtonContent(project.id)
+          return (
+            <Card key={project.id} className="hover:shadow-lg transition-shadow">
+              <CardHeader>
+                <CardTitle>{project.title}</CardTitle>
+                <CardDescription>By {project.owner}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground">{project.description}</p>
+              </CardContent>
+              <CardFooter>
+                {isAuthenticated ? (
+                  buttonContent.disabled ? (
+                    <Button 
+                      className="w-full" 
+                      variant={buttonContent.variant}
+                      disabled={true}
+                    >
+                      {buttonContent.text}
+                    </Button>
+                  ) : (
+                    <ApplyToJoinDialog
+                      projectId={project.id}
+                      trigger={
+                        <Button className="w-full">
+                          {buttonContent.text}
+                        </Button>
+                      }
+                    />
+                  )
+                ) : (
+                  <Button className="w-full" variant="outline" asChild>
+                    <Link href="/login">Sign in to Apply</Link>
+                  </Button>
+                )}
+              </CardFooter>
+            </Card>
+          )
+        })}
       </div>
     </div>
   )
