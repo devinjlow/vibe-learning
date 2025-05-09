@@ -17,10 +17,10 @@ export function Nav() {
     const checkAuth = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession()
-        console.log('Initial session check:', !!session)
+        console.log('Nav - Session check:', session)
         setIsAuthenticated(!!session)
       } catch (error) {
-        console.error('Error checking auth status:', error)
+        console.error('Nav - Error checking auth:', error)
         setIsAuthenticated(false)
       } finally {
         setIsLoading(false)
@@ -29,9 +29,8 @@ export function Nav() {
 
     checkAuth()
 
-    // Subscribe to auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('Auth state changed:', event, !!session)
+      console.log('Nav - Auth state changed:', event, session)
       setIsAuthenticated(!!session)
     })
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -17,7 +17,17 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [resetSent, setResetSent] = useState(false)
+  const [retryAfter, setRetryAfter] = useState<number | null>(null)
   const supabase = createClientComponentClient()
+
+  // Clear retry timer when component unmounts
+  useEffect(() => {
+    return () => {
+      if (retryAfter) {
+        clearTimeout(retryAfter)
+      }
+    }
+  }, [retryAfter])
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -33,6 +43,16 @@ export default function LoginPage() {
 
       if (error) {
         console.error('Sign in error:', error)
+        // Check if it's a rate limit error
+        if (error.message.includes('rate limit')) {
+          const retryTime = 60 // 60 seconds
+          setRetryAfter(retryTime)
+          const timer = setTimeout(() => {
+            setRetryAfter(null)
+          }, retryTime * 1000)
+          setRetryAfter(timer as unknown as number)
+          throw new Error(`Rate limit reached. Please try again in ${retryTime} seconds.`)
+        }
         throw error
       }
 
@@ -124,7 +144,7 @@ export default function LoginPage() {
                 placeholder="m@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                disabled={loading}
+                disabled={loading || retryAfter !== null}
                 required
               />
             </div>
@@ -135,7 +155,7 @@ export default function LoginPage() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                disabled={loading}
+                disabled={loading || retryAfter !== null}
                 required
               />
             </div>
@@ -149,15 +169,15 @@ export default function LoginPage() {
                 Password reset email sent! Check your inbox.
               </div>
             )}
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? 'Signing in...' : 'Sign In'}
+            <Button type="submit" className="w-full" disabled={loading || retryAfter !== null}>
+              {loading ? 'Signing in...' : retryAfter ? 'Please wait...' : 'Sign In'}
             </Button>
           </form>
           <div className="text-sm text-center">
             <button
               onClick={handleResetPassword}
               className="text-primary hover:underline"
-              disabled={loading || !email}
+              disabled={loading || !email || retryAfter !== null}
             >
               Forgot your password?
             </button>

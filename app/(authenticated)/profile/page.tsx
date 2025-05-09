@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
-import { supabase } from '@/lib/supabase'
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import {
   Select,
   SelectContent,
@@ -15,6 +15,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { X } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
+import { LoadingSplash } from "@/components/ui/loading-splash"
 
 interface UserDetails {
   id?: string
@@ -34,70 +35,56 @@ interface UserDetailsData {
   created_at?: string
 }
 
-// Mock data for user's projects and tasks
+type InterestOption = 'Business' | 'Finance' | 'Engineering' | 'Health & Wellness' | 'Education' | 'Entertainment' | 'Social Impact' | 'Technology'
+type ExperienceOption = '< 1 year' | '1 - 3 years' | '4 - 7 years' | '8+ years'
+
+const backgroundOptions = [
+  'Student',
+  'Engineering Professional',
+  'Self-taught Developer',
+  'Bootcamp Graduate',
+  'Other'
+]
+
+const experienceOptions = [
+  '< 1 year',
+  '1 - 3 years',
+  '4 - 7 years',
+  '8+ years'
+]
+
+const interestOptions: InterestOption[] = [
+  'Business',
+  'Finance',
+  'Engineering',
+  'Health & Wellness',
+  'Education',
+  'Entertainment',
+  'Social Impact',
+  'Technology'
+]
+
+// Mock data for user projects
 const userProjects = [
   {
     id: 1,
     title: "AI-Powered Code Review System",
     role: "Lead Developer",
     tasks: [
-      { id: 1, title: "Implement ML model for code analysis", status: "In Progress" },
-      { id: 2, title: "Design API endpoints", status: "Completed" },
-    ],
+      { id: 1, title: "Set up ML pipeline", status: "In Progress" },
+      { id: 2, title: "Implement code analysis", status: "Todo" }
+    ]
   },
   {
     id: 2,
     title: "Real-time Collaboration Platform",
     role: "Backend Developer",
     tasks: [
-      { id: 1, title: "Set up WebSocket server", status: "To Do" },
-      { id: 2, title: "Implement real-time sync", status: "In Progress" },
-    ],
-  },
+      { id: 3, title: "Design WebSocket architecture", status: "Completed" },
+      { id: 4, title: "Implement real-time sync", status: "In Progress" }
+    ]
+  }
 ]
-
-const backgroundOptions = [
-  "Student",
-  "Engineering Professional",
-  "Self-taught Developer",
-  "Bootcamp Graduate",
-  "Other"
-] as const
-
-const backgroundDisplayNames = {
-  computer_science: "Computer Science",
-  software_engineering: "Software Engineering",
-  data_science: "Data Science",
-  web_development: "Web Development",
-  mobile_development: "Mobile Development",
-  devops: "DevOps",
-  other: "Other"
-} as const
-
-const experienceOptions = [
-  "0-2 years",
-  "2-5 years",
-  "5-10 years",
-  "10+ years"
-] as const
-
-const interestOptions = [
-  "Machine Learning",
-  "Web Development",
-  "Mobile Development",
-  "Cloud Computing",
-  "DevOps",
-  "Data Science",
-  "Cybersecurity",
-  "UI/UX Design",
-  "Game Development",
-  "Blockchain",
-  "Health & Wellness"
-] as const
-
-type BackgroundOption = typeof backgroundOptions[number]
-type ExperienceOption = typeof experienceOptions[number]
-type InterestOption = typeof interestOptions[number]
 
 export default function Profile() {
   const { toast } = useToast()
@@ -105,11 +92,19 @@ export default function Profile() {
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
+  const supabase = createClientComponentClient()
 
   useEffect(() => {
     const fetchUserDetails = async () => {
       try {
+        // (Removed 5 second delay for loading splash testing)
+
+        // Debug: Log session state before fetching user
+        const sessionResult = await supabase.auth.getSession();
+        console.log('DEBUG: Session result before getUser:', sessionResult);
+
         const { data: { user } } = await supabase.auth.getUser()
+        console.log('DEBUG: User from getUser:', user);
         if (!user) throw new Error('No user found')
 
         const { data, error } = await supabase
@@ -143,7 +138,7 @@ export default function Profile() {
     }
 
     fetchUserDetails()
-  }, [toast])
+  }, [toast, supabase])
 
   const handleSave = async () => {
     if (!userDetails) return
@@ -250,7 +245,7 @@ export default function Profile() {
   }
 
   if (loading) {
-    return <div className="flex items-center justify-center min-h-screen">Loading...</div>
+    return <LoadingSplash onComplete={() => setLoading(false)} />
   }
 
   return (
@@ -316,11 +311,14 @@ export default function Profile() {
               <h3 className="font-medium mb-2">Experience</h3>
               {editing ? (
                 <Select
+                  defaultValue={userDetails?.experience}
                   value={userDetails?.experience}
                   onValueChange={(value: ExperienceOption) => setUserDetails(prev => prev ? { ...prev, experience: value } : null)}
                 >
                   <SelectTrigger className="w-[200px]">
-                    <SelectValue placeholder="Select experience" />
+                    <SelectValue>
+                      {userDetails?.experience || "Select experience"}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {experienceOptions.map((option) => (

@@ -17,33 +17,24 @@ interface ProjectsListProps {
   projects: Project[]
 }
 
+// Import the shared auth state
+declare const authState: {
+  isAuthenticated: boolean
+  isLoading: boolean
+  listeners: Set<(isAuthenticated: boolean) => void>
+}
+
 export function ProjectsList({ projects }: ProjectsListProps) {
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
+  const [isAuthenticated, setIsAuthenticated] = useState(authState.isAuthenticated)
+  const [isLoading, setIsLoading] = useState(authState.isLoading)
 
   useEffect(() => {
-    // Check authentication state on mount
-    const checkAuth = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser()
-        setIsAuthenticated(!!user)
-      } catch (error) {
-        console.error('Error checking auth:', error)
-        setIsAuthenticated(false)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    checkAuth()
-
-    // Subscribe to auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setIsAuthenticated(!!session?.user)
-    })
+    // Add this component as a listener
+    authState.listeners.add(setIsAuthenticated)
+    setIsLoading(authState.isLoading)
 
     return () => {
-      subscription.unsubscribe()
+      authState.listeners.delete(setIsAuthenticated)
     }
   }, [])
 

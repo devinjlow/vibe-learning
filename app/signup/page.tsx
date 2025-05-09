@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { supabase } from '@/lib/supabase'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -14,6 +14,17 @@ export default function SignUp() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [retryAfter, setRetryAfter] = useState<number | null>(null)
+  const supabase = createClientComponentClient()
+
+  // Clear retry timer when component unmounts
+  useEffect(() => {
+    return () => {
+      if (retryAfter) {
+        clearTimeout(retryAfter)
+      }
+    }
+  }, [retryAfter])
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -30,6 +41,16 @@ export default function SignUp() {
       })
 
       if (error) {
+        // Check if it's a rate limit error
+        if (error.message.includes('rate limit')) {
+          const retryTime = 60 // 60 seconds
+          setRetryAfter(retryTime)
+          const timer = setTimeout(() => {
+            setRetryAfter(null)
+          }, retryTime * 1000)
+          setRetryAfter(timer as unknown as number)
+          throw new Error(`Rate limit reached. Please try again in ${retryTime} seconds.`)
+        }
         throw error
       }
 
@@ -68,7 +89,7 @@ export default function SignUp() {
                   autoCapitalize="none"
                   autoComplete="email"
                   autoCorrect="off"
-                  disabled={loading}
+                  disabled={loading || retryAfter !== null}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -79,7 +100,7 @@ export default function SignUp() {
                 <Input
                   id="password"
                   type="password"
-                  disabled={loading}
+                  disabled={loading || retryAfter !== null}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
@@ -90,8 +111,8 @@ export default function SignUp() {
                   {error}
                 </div>
               )}
-              <Button disabled={loading}>
-                {loading ? 'Creating account...' : 'Create account'}
+              <Button disabled={loading || retryAfter !== null}>
+                {loading ? 'Creating account...' : retryAfter ? 'Please wait...' : 'Create account'}
               </Button>
             </div>
           </form>
