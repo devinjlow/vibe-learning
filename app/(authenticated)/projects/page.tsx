@@ -1,15 +1,27 @@
 'use client';
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import { ProjectsList } from "@/components/project/projects-list"
-import { supabase } from "@/lib/supabase"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { CreateProjectDialog } from "@/components/project/create-project-dialog"
 
 interface Project {
   id: string
   title: string
   description: string
-  owner: string
+  user_id: string
+  platforms?: string[]
+  tech_stack?: string[]
+  timeline?: string
+  team_size?: string
+  status?: string
+  created_at?: string
+  updated_at?: string
+}
+
+interface UserEmailMap {
+  [userId: string]: string
 }
 
 type Tab = 'explore' | 'joined'
@@ -18,7 +30,10 @@ export default function ProjectsPage() {
   const [activeTab, setActiveTab] = useState<Tab>('explore')
   const [projects, setProjects] = useState<Project[]>([])
   const [joinedProjects, setJoinedProjects] = useState<Project[]>([])
+  const [userEmails, setUserEmails] = useState<UserEmailMap>({})
   const [loading, setLoading] = useState(true)
+  const fetchProjectsRef = useRef<() => Promise<void>>(() => Promise.resolve())
+  const supabase = createClientComponentClient()
 
   useEffect(() => {
     async function fetchProjects() {
@@ -42,7 +57,7 @@ export default function ProjectsPage() {
         if (user) {
           const { data: memberships, error: membershipsError } = await supabase
             .from('project_members')
-            .select('project_id')
+            .select('project_id, status')
             .eq('user_id', user.id)
             .eq('status', 'accepted')
 
@@ -52,10 +67,11 @@ export default function ProjectsPage() {
           }
 
           if (memberships && memberships.length > 0) {
+            const projectIds = memberships.map(m => m.project_id)
             const { data: joinedData, error: joinedError } = await supabase
               .from('projects')
               .select('*')
-              .in('id', memberships.map(m => m.project_id))
+              .in('id', projectIds)
 
             if (joinedError) {
               console.error('Error fetching joined projects:', joinedError)
@@ -63,7 +79,30 @@ export default function ProjectsPage() {
             }
 
             setJoinedProjects(joinedData || [])
+            // Collect all user_ids from both lists for email lookup
+            const allUserIds = Array.from(new Set([
+              ...data.map((p: Project) => p.user_id),
+              ...(joinedData || []).map((p: Project) => p.user_id)
+            ]))
+            if (allUserIds.length > 0) {
+              // Fetch emails from auth.users
+              const { data: usersData, error: usersError } = await supabase
+                .from('users')
+                .select('id, email')
+                .in('id', allUserIds)
+              if (!usersError && usersData) {
+                const emailMap: UserEmailMap = {}
+                usersData.forEach((u: any) => {
+                  emailMap[u.id] = u.email
+                })
+                setUserEmails(emailMap)
+              }
+            }
+          } else {
+            setJoinedProjects([])
           }
+        } else {
+          setJoinedProjects([])
         }
       } catch (error) {
         console.error('Error:', error)
@@ -72,15 +111,21 @@ export default function ProjectsPage() {
       }
     }
 
+    fetchProjectsRef.current = fetchProjects
     fetchProjects()
   }, [])
+
+  const handleProjectCreated = () => {
+    setLoading(true)
+    fetchProjectsRef.current()
+  }
 
   if (loading) {
     return <div>Loading projects...</div>
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 mt-8">
       <div className="border-b">
         <div className="flex space-x-8">
           <button
@@ -107,7 +152,23 @@ export default function ProjectsPage() {
       </div>
 
       {activeTab === 'explore' ? (
-        <ProjectsList projects={projects} />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {projects.map((project) => (
+            <Card key={project.id} className="hover:shadow-lg transition-shadow">
+              <CardHeader>
+                <div className="flex items-center gap-4">
+                  <CardTitle>{project.title}</CardTitle>
+                  <span className="text-muted-foreground text-sm">
+                    {project.platforms?.join(', ')} - {project.tech_stack?.join(', ')}
+                  </span>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground">{project.description}</p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       ) : (
         <div className="space-y-6">
           {joinedProjects.length === 0 ? (
@@ -120,12 +181,16 @@ export default function ProjectsPage() {
           ) : (
             <>
               <h1 className="text-3xl font-bold">My Projects</h1>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 gap-6">
                 {joinedProjects.map((project) => (
                   <Card key={project.id} className="hover:shadow-lg transition-shadow">
                     <CardHeader>
-                      <CardTitle>{project.title}</CardTitle>
-                      <CardDescription>By {project.owner}</CardDescription>
+                      <div className="flex items-center gap-4">
+                        <CardTitle>{project.title}</CardTitle>
+                        <span className="text-muted-foreground text-sm">
+                          {project.platforms?.join(', ')} - {project.tech_stack?.join(', ')}
+                        </span>
+                      </div>
                     </CardHeader>
                     <CardContent>
                       <p className="text-sm text-muted-foreground">{project.description}</p>

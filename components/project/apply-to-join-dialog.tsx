@@ -5,7 +5,7 @@ import { Loader2 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { supabase } from "@/lib/supabase"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 
 interface ApplyToJoinDialogProps {
   projectId: string
@@ -17,48 +17,34 @@ export function ApplyToJoinDialog({ projectId, trigger }: ApplyToJoinDialogProps
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const supabase = createClientComponentClient()
 
   const handleApply = async () => {
     setLoading(true)
     setError(null)
-
     try {
-      console.log('Starting apply process...')
-      
-      // Get the current user
-      const { data: { user }, error: userError } = await supabase.auth.getUser()
-      console.log('Current user:', user)
-      
-      if (userError) {
-        console.error('Auth error:', userError)
-        throw new Error('Authentication error. Please sign in to apply.')
-      }
-      
+      // Get the current session user (assume authenticated)
+      const { data: { session } } = await supabase.auth.getSession()
+      const user = session?.user
       if (!user) {
-        throw new Error('Please sign in to apply.')
+        throw new Error('Authentication error. Please sign in to apply.')
       }
 
       // Check if user has already applied
-      console.log('Checking for existing application...')
       const { data: existingApplications, error: checkError } = await supabase
         .from('project_members')
         .select('*')
         .eq('project_id', projectId)
         .eq('user_id', user.id)
 
-      console.log('Existing application check:', { existingApplications, checkError })
-
       if (checkError) {
-        console.error('Error checking existing application:', checkError)
         throw new Error('Error checking existing application.')
       }
-
       if (existingApplications && existingApplications.length > 0) {
         throw new Error('You have already applied to this project.')
       }
 
       // Create the application
-      console.log('Creating new application...')
       const { error: insertError } = await supabase
         .from('project_members')
         .insert([
@@ -68,17 +54,12 @@ export function ApplyToJoinDialog({ projectId, trigger }: ApplyToJoinDialogProps
             status: 'pending'
           }
         ])
-
       if (insertError) {
-        console.error('Error creating application:', insertError)
         throw new Error('Failed to create application. Please try again.')
       }
-
-      console.log('Application created successfully!')
       setOpen(false)
       router.refresh()
     } catch (error) {
-      console.error('Error applying to project:', error)
       setError(error instanceof Error ? error.message : 'Failed to apply. Please try again.')
     } finally {
       setLoading(false)

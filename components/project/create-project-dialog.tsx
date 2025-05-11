@@ -8,13 +8,14 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { supabase } from "@/lib/supabase"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 
 interface CreateProjectDialogProps {
   trigger: React.ReactNode
+  onProjectCreated?: () => void
 }
 
-export function CreateProjectDialog({ trigger }: CreateProjectDialogProps) {
+export function CreateProjectDialog({ trigger, onProjectCreated }: CreateProjectDialogProps) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -27,25 +28,19 @@ export function CreateProjectDialog({ trigger }: CreateProjectDialogProps) {
     timeline: "",
     teamSize: "",
   })
+  const supabase = createClientComponentClient()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError(null)
-
     try {
-      // Get the current user
-      const { data: { user }, error: userError } = await supabase.auth.getUser()
-      
-      if (userError) {
-        console.error('Auth error:', userError)
+      // Get the current session user (assume authenticated)
+      const { data: { session } } = await supabase.auth.getSession()
+      const user = session?.user
+      if (!user) {
         throw new Error('Authentication error. Please sign in to create a project.')
       }
-      
-      if (!user) {
-        throw new Error('Please sign in to create a project.')
-      }
-
       // Prepare the project data
       const projectData = {
         user_id: user.id,
@@ -58,20 +53,35 @@ export function CreateProjectDialog({ trigger }: CreateProjectDialogProps) {
         status: 'planning',
         created_at: new Date().toISOString(),
       }
-
-      const { error: insertError } = await supabase
+      // Insert the new project and get its id
+      const { data: insertedProjects, error: insertError } = await supabase
         .from('projects')
         .insert([projectData])
-
+        .select('id')
       if (insertError) {
-        console.error('Insert error:', insertError)
         throw new Error(insertError.message)
       }
-
+      const projectId = insertedProjects?.[0]?.id
+      if (!projectId) {
+        throw new Error('Failed to retrieve new project ID.')
+      }
+      // Add the creator as a member with status 'accepted'
+      const { error: memberError } = await supabase
+        .from('project_members')
+        .insert([
+          {
+            project_id: projectId,
+            user_id: user.id,
+            status: 'accepted',
+          }
+        ])
+      if (memberError) {
+        throw new Error('Project created, but failed to add creator as member.')
+      }
+      if (onProjectCreated) onProjectCreated();
       setOpen(false)
       router.refresh()
     } catch (error) {
-      console.error('Error creating project:', error)
       setError(error instanceof Error ? error.message : 'Failed to create project. Please try again.')
     } finally {
       setLoading(false)
