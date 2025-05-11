@@ -12,7 +12,8 @@ interface Project {
   id: string
   title: string
   description: string
-  owner: string
+  platforms?: string[]
+  tech_stack?: string[]
 }
 
 interface ProjectMember {
@@ -145,7 +146,9 @@ export function ProjectsList({ projects }: ProjectsListProps) {
               <Card key={project.id} className="hover:shadow-lg transition-shadow">
                 <CardHeader>
                   <CardTitle>{project.title}</CardTitle>
-                  <CardDescription>By {project.owner}</CardDescription>
+                  <CardDescription>
+                    {project.platforms?.join(', ')} - {project.tech_stack?.join(', ')}
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm text-muted-foreground">{project.description}</p>

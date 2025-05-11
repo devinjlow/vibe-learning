@@ -152,23 +152,15 @@ export default function ProjectsPage() {
       </div>
 
       {activeTab === 'explore' ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {projects.map((project) => (
-            <Card key={project.id} className="hover:shadow-lg transition-shadow">
-              <CardHeader>
-                <div className="flex items-center gap-4">
-                  <CardTitle>{project.title}</CardTitle>
-                  <span className="text-muted-foreground text-sm">
-                    {project.platforms?.join(', ')} - {project.tech_stack?.join(', ')}
-                  </span>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">{project.description}</p>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        <ProjectsList 
+          projects={projects.map(project => ({
+            id: project.id,
+            title: project.title,
+            description: project.description,
+            platforms: project.platforms,
+            tech_stack: project.tech_stack
+          }))} 
+        />
       ) : (
         <div className="space-y-6">
           {joinedProjects.length === 0 ? (
