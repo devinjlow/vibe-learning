@@ -1,34 +1,24 @@
-'use client';
+import type { Metadata } from "next";
+import { Inter } from "next/font/google";
+import "../globals.css";
+import { Toaster } from "@/components/ui/toaster";
 
-import { Nav } from "@/components/ui/nav"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
-import { useEffect } from "react"
-import { useRouter } from "next/navigation"
+const inter = Inter({ subsets: ["latin"] });
 
-interface AuthenticatedLayoutProps {
+export const metadata: Metadata = {
+  title: "Vibe Learning",
+  description: "Learn and grow with Vibe Learning",
+};
+
+export default function AuthenticatedLayout({
+  children,
+}: Readonly<{
   children: React.ReactNode
-}
-
-export default function AuthenticatedLayout({ children }: AuthenticatedLayoutProps) {
-  const router = useRouter()
-  const supabase = createClientComponentClient()
-
-  useEffect(() => {
-    const checkAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) {
-        router.push('/login')
-      }
-    }
-    checkAuth()
-  }, [router, supabase])
-
+}>) {
   return (
-    <div className="min-h-screen">
-      <Nav />
-      <main className="container mx-auto px-4 py-8">
-        {children}
-      </main>
+    <div className={`relative min-h-screen flex flex-col ${inter.className} container mx-auto`}>
+      {children}
+      <Toaster />
     </div>
-  )
+  );
 } 

@@ -6,8 +6,7 @@ import { Button } from "@/components/ui/button"
 import { CreateProjectDialog } from "@/components/project/create-project-dialog"
 import { ApplyToJoinDialog } from "@/components/project/apply-to-join-dialog"
 import Link from "next/link"
-import { supabase } from "@/lib/supabase"
-import { authState } from "@/lib/auth-state"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 
 interface Project {
   id: string
@@ -28,24 +27,24 @@ interface ProjectsListProps {
 }
 
 export function ProjectsList({ projects }: ProjectsListProps) {
-  const [isAuthenticated, setIsAuthenticated] = useState(authState.isAuthenticated)
-  const [isLoading, setIsLoading] = useState(authState.isLoading)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
   const [projectMemberships, setProjectMemberships] = useState<Record<string, ProjectMember>>({})
+  const supabase = createClientComponentClient()
 
   useEffect(() => {
-    // Check authentication state on mount
     const checkAuth = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser()
-        setIsAuthenticated(!!user)
-        authState.updateAuthState(!!user)
-        
-        if (user) {
+        const { data: { session } } = await supabase.auth.getSession()
+        console.log('ProjectsList - Session:', session)
+        setIsAuthenticated(!!session)
+        if (session?.user) {
+          console.log('ProjectsList - User:', session.user)
           // Fetch all project memberships for the current user
           const { data: memberships, error } = await supabase
             .from('project_members')
             .select('*')
-            .eq('user_id', user.id)
+            .eq('user_id', session.user.id)
 
           if (error) {
             console.error('Error fetching memberships:', error)
@@ -59,39 +58,32 @@ export function ProjectsList({ projects }: ProjectsListProps) {
           }, {} as Record<string, ProjectMember>)
 
           setProjectMemberships(membershipsMap)
+        } else {
+          console.log('ProjectsList - No user found in session')
         }
       } catch (error) {
-        console.error('Error checking auth:', error)
+        console.error('ProjectsList - Error checking auth:', error)
         setIsAuthenticated(false)
-        authState.updateAuthState(false)
       } finally {
         setIsLoading(false)
-        authState.setLoading(false)
       }
     }
 
     checkAuth()
 
-    // Subscribe to auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       const isAuth = !!session?.user
       setIsAuthenticated(isAuth)
-      authState.updateAuthState(isAuth)
+      console.log('ProjectsList - Auth state changed:', event, session)
     })
 
-    // Add this component as a listener
-    authState.listeners.add(setIsAuthenticated)
-    setIsLoading(authState.isLoading)
-
     return () => {
-      authState.listeners.delete(setIsAuthenticated)
       subscription.unsubscribe()
     }
-  }, [])
+  }, [supabase])
 
   const getButtonContent = (projectId: string) => {
     const membership = projectMemberships[projectId]
-    
     if (!membership) {
       return {
         text: "Apply to Join",
@@ -99,7 +91,6 @@ export function ProjectsList({ projects }: ProjectsListProps) {
         disabled: false
       }
     }
-
     switch (membership.status) {
       case 'pending':
         return {
@@ -140,48 +131,56 @@ export function ProjectsList({ projects }: ProjectsListProps) {
           />
         )}
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {projects?.map((project) => {
-          const buttonContent = getButtonContent(project.id)
-          return (
-            <Card key={project.id} className="hover:shadow-lg transition-shadow">
-              <CardHeader>
-                <CardTitle>{project.title}</CardTitle>
-                <CardDescription>By {project.owner}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">{project.description}</p>
-              </CardContent>
-              <CardFooter>
-                {isAuthenticated ? (
-                  buttonContent.disabled ? (
-                    <Button 
-                      className="w-full" 
-                      variant={buttonContent.variant}
-                      disabled={true}
-                    >
-                      {buttonContent.text}
-                    </Button>
+      {isLoading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="h-40 bg-muted rounded-lg animate-pulse" />
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {projects?.map((project) => {
+            const buttonContent = getButtonContent(project.id)
+            return (
+              <Card key={project.id} className="hover:shadow-lg transition-shadow">
+                <CardHeader>
+                  <CardTitle>{project.title}</CardTitle>
+                  <CardDescription>By {project.owner}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground">{project.description}</p>
+                </CardContent>
+                <CardFooter>
+                  {isAuthenticated ? (
+                    buttonContent.disabled ? (
+                      <Button 
+                        className="w-full" 
+                        variant={buttonContent.variant}
+                        disabled={true}
+                      >
+                        {buttonContent.text}
+                      </Button>
+                    ) : (
+                      <ApplyToJoinDialog
+                        projectId={project.id}
+                        trigger={
+                          <Button className="w-full">
+                            {buttonContent.text}
+                          </Button>
+                        }
+                      />
+                    )
                   ) : (
-                    <ApplyToJoinDialog
-                      projectId={project.id}
-                      trigger={
-                        <Button className="w-full">
-                          {buttonContent.text}
-                        </Button>
-                      }
-                    />
-                  )
-                ) : (
-                  <Button className="w-full" variant="outline" asChild>
-                    <Link href="/login">Sign in to Apply</Link>
-                  </Button>
-                )}
-              </CardFooter>
-            </Card>
-          )
-        })}
-      </div>
+                    <Button className="w-full" variant="outline" asChild>
+                      <Link href="/login">Sign in to Apply</Link>
+                    </Button>
+                  )}
+                </CardFooter>
+              </Card>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 } 
