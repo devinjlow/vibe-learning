@@ -94,6 +94,16 @@ export function Nav() {
                 Projects
               </Link>
               <Link 
+                href="/chats"
+                className={`px-3 py-1.5 text-sm font-medium rounded-full transition-colors ${
+                  pathname === '/chats' 
+                    ? 'bg-secondary text-secondary-foreground' 
+                    : 'text-foreground/60 hover:text-foreground hover:bg-secondary/50'
+                }`}
+              >
+                Chats
+              </Link>
+              <Link 
                 href="/profile"
                 className={`px-3 py-1.5 text-sm font-medium rounded-full transition-colors ${
                   pathname === '/profile' 
