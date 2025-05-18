@@ -72,6 +72,7 @@ export function CreateProjectDialog({ trigger, onProjectCreated }: CreateProject
           {
             project_id: projectId,
             user_id: user.id,
+            email: user.email,
             status: 'accepted',
           }
         ])

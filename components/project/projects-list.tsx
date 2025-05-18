@@ -89,7 +89,8 @@ export function ProjectsList({ projects }: ProjectsListProps) {
       return {
         text: "Apply to Join",
         variant: "default" as const,
-        disabled: false
+        disabled: false,
+        isJoined: false
       }
     }
     switch (membership.status) {
@@ -97,25 +98,29 @@ export function ProjectsList({ projects }: ProjectsListProps) {
         return {
           text: "Application Pending",
           variant: "outline" as const,
-          disabled: true
+          disabled: true,
+          isJoined: false
         }
       case 'accepted':
         return {
-          text: "Already Joined",
-          variant: "outline" as const,
-          disabled: true
+          text: "View Project",
+          variant: "default" as const,
+          disabled: false,
+          isJoined: true
         }
       case 'rejected':
         return {
           text: "Application Rejected",
           variant: "outline" as const,
-          disabled: true
+          disabled: true,
+          isJoined: false
         }
       default:
         return {
           text: "Apply to Join",
           variant: "default" as const,
-          disabled: false
+          disabled: false,
+          isJoined: false
         }
     }
   }
@@ -144,15 +149,17 @@ export function ProjectsList({ projects }: ProjectsListProps) {
             const buttonContent = getButtonContent(project.id)
             return (
               <Card key={project.id} className="hover:shadow-lg transition-shadow">
-                <CardHeader>
-                  <CardTitle>{project.title}</CardTitle>
-                  <CardDescription>
-                    {project.platforms?.join(', ')} - {project.tech_stack?.join(', ')}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground">{project.description}</p>
-                </CardContent>
+                <Link href={`/projects/${project.id}`} className="block">
+                  <CardHeader>
+                    <CardTitle>{project.title}</CardTitle>
+                    <CardDescription>
+                      {project.platforms?.join(', ')} - {project.tech_stack?.join(', ')}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground">{project.description}</p>
+                  </CardContent>
+                </Link>
                 <CardFooter>
                   {isAuthenticated ? (
                     buttonContent.disabled ? (
@@ -162,6 +169,12 @@ export function ProjectsList({ projects }: ProjectsListProps) {
                         disabled={true}
                       >
                         {buttonContent.text}
+                      </Button>
+                    ) : buttonContent.isJoined ? (
+                      <Button className="w-full" asChild>
+                        <Link href={`/projects/${project.id}`}>
+                          {buttonContent.text}
+                        </Link>
                       </Button>
                     ) : (
                       <ApplyToJoinDialog

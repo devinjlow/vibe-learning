@@ -5,6 +5,8 @@ import { ProjectsList } from "@/components/project/projects-list"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { CreateProjectDialog } from "@/components/project/create-project-dialog"
+import Link from "next/link"
+import { Loader2 } from "lucide-react"
 
 interface Project {
   id: string
@@ -87,7 +89,7 @@ export default function ProjectsPage() {
             if (allUserIds.length > 0) {
               // Fetch emails from auth.users
               const { data: usersData, error: usersError } = await supabase
-                .from('users')
+                .from('auth.users')
                 .select('id, email')
                 .in('id', allUserIds)
               if (!usersError && usersData) {
@@ -121,7 +123,14 @@ export default function ProjectsPage() {
   }
 
   if (loading) {
-    return <div>Loading projects...</div>
+    return (
+      <div className="h-[calc(100vh-4rem)] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-muted-foreground">Loading projects...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -175,19 +184,21 @@ export default function ProjectsPage() {
               <h1 className="text-3xl font-bold">My Projects</h1>
               <div className="grid grid-cols-1 gap-6">
                 {joinedProjects.map((project) => (
-                  <Card key={project.id} className="hover:shadow-lg transition-shadow">
-                    <CardHeader>
-                      <div className="flex items-center gap-4">
-                        <CardTitle>{project.title}</CardTitle>
-                        <span className="text-muted-foreground text-sm">
-                          {project.platforms?.join(', ')} - {project.tech_stack?.join(', ')}
-                        </span>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-sm text-muted-foreground">{project.description}</p>
-                    </CardContent>
-                  </Card>
+                  <Link key={project.id} href={`/projects/${project.id}`}>
+                    <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+                      <CardHeader>
+                        <div className="flex items-center gap-4">
+                          <CardTitle>{project.title}</CardTitle>
+                          <span className="text-muted-foreground text-sm">
+                            {project.platforms?.join(', ')} - {project.tech_stack?.join(', ')}
+                          </span>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-sm text-muted-foreground">{project.description}</p>
+                      </CardContent>
+                    </Card>
+                  </Link>
                 ))}
               </div>
             </>
