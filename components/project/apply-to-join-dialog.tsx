@@ -51,6 +51,7 @@ export function ApplyToJoinDialog({ projectId, trigger }: ApplyToJoinDialogProps
           {
             project_id: projectId,
             user_id: user.id,
+            email: user.email,
             status: 'pending'
           }
         ])
